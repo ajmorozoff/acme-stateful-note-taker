@@ -121,7 +121,7 @@
             async postNote(ev){
                 ev.preventDefault();
                 //const newNote = await axios.post(`https://acme-users-api-rev.herokuapp.com/api/users/${this.state.user.id}/notes`, {archived: false, text: `test note text`});
-                const newNote = await axios.post(`https://acme-users-api-rev.herokuapp.com/api/users/${this.state.user.id}/notes`, {archived: false, text: this.state.noteText.toString()});
+                const newNote = await axios.post(`https://acme-users-api-rev.herokuapp.com/api/users/${this.state.user.id}/notes`, {archived: false, text: `${this.state.noteText}`});
                 console.log(newNote);
             }
         }
