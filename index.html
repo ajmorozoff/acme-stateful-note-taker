@@ -25,8 +25,11 @@
     </body>
     <script type='text/babel'>
         const root = document.getElementById('root');
-
         const API = 'https://acme-users-api-rev.herokuapp.com/api';
+        const { Component } = React;
+        const { render } = ReactDOM;
+        const { Switch, Link, Route, BrowserRouter, Redirect } = ReactRouterDOM;
+
 
         const fetchUser = async ()=> {
         const storage = window.localStorage;
@@ -44,88 +47,117 @@
         storage.setItem('userId', user.id);
         return  user;
         };
+        
+        class App extends Component {
+            constructor(){
+                super();
+                this.state = {
+                    user: null,
+                    notesCount: 0,
+                };
+            }
 
-        class NotesDisplay extends React.Component{
+            async componentDidMount(){
+                const user = await fetchUser();
+                this.setState({user});
+                console.log('App componentDidMount', this.state.user);
+            }
+
+            render(){
+                if(this.state.user){
+                    return (
+                        <div>
+                            <h1>Acme Note-taker for {this.state.user.fullName}</h1>
+                                <BrowserRouter>
+                                    <Link to="/notes">All Notes</Link>
+                                    <Link to="/create">Create Notes</Link>
+                                    <Switch>
+                                        <Route path="/notes" render={() => <NotesDisplay user={this.state.user} />} />
+                                        <Route path="/create" render={() => <NoteCreate user={this.state.user} />} />
+                                    </Switch>
+                                </BrowserRouter>
+                        </div>
+                    )
+                }
+                return <div>Loading...</div>
+            }
+        }
+
+        class NotesDisplay extends Component {
             constructor(props){
                 super();
-                this.state = {user: props.user, notes: null};
-                console.log(this.state);
-                
+                this.state = {
+                    user: props.user, 
+                    notes: null
+                };
+                this.DELETENote = this.DELETENote.bind(this);
             }
+
+            async fetchNotes() {
+                const response = await axios.get(`https://acme-users-api-rev.herokuapp.com/api/users/${this.state.user.id}/notes`);
+                this.setState({ notes: response.data });
+            }
+
             async componentDidMount(){
-                const notes = await axios.get(`https://acme-users-api-rev.herokuapp.com/api/users/${this.state.user.id}/notes`).data;
-                this.setState({notes});
+                await this.fetchNotes();
             }
+
+            async DELETENote(noteID) {
+                await axios.delete(`https://acme-users-api-rev.herokuapp.com/api/users/${this.state.user.id}/notes/${noteID}`);
+                await this.fetchNotes();
+            }
+
             render(){
                 if(this.state.notes){
                     return (
                         <ul>
                             {
                                 this.state.notes.map(note => 
-                            <li key={note.id}>
-                            note.text<button>Archieve</button><button>Destroy</button>
-                            </li>)
+                                <li key={note.id}>
+                                    {note.text}
+                                    <button>Archive</button>
+                                    <button onClick={() => {this.DELETENote(note.id)}}>Destroy</button>
+                                </li>)
                             }
                         </ul>
                     );
                 }
-                return <div>Loading...</div>
-            }
-        }
-        
-        class APP extends React.Component{
-            constructor(){
-                super();
-                this.state = {user: null};
-            }
-            async componentDidMount(){
-                const user = await fetchUser();
-                this.setState({user});
-                //console.log(this.state.user);
-            }
-
-            render(){
-                if(this.state.user){
-                    return <div><h1>Acme Note-taker for {this.state.user.fullName}</h1><NotesDisplay user={this.state.user} />
-                    <NoteCreate user={this.state.user} />
-                    </div>
-                }
-                return <div>Loading...</div>
+                return <div>No notes</div>
             }
         }
 
-        class NoteCreate extends React.Component{
+        class NoteCreate extends Component{
             constructor(props){
                 super();
                 this.state = {
                     user: props.user, 
                     noteText:''
                     };
-                this.updateText = this.updateText.bind(this);
-                this.postNote = this.postNote.bind(this);
+                this.logText = this.logText.bind(this);
+                this.POSTNote = this.POSTNote.bind(this);
             }
             render(){
                 return(
-                    <form onSubmit={this.postNote}>
-                        <input type='text' name ='noteText' onChange={this.updateText}/>
+                    <form onSubmit={this.POSTNote}>
+                        <input type='text' name='noteText' onChange={this.logText}/>
                         <button>Create</button>
                     </form>
                 );
             }
 
-            updateText(ev){
+            logText(ev){
                 this.setState({[ev.target.name]: ev.target.value});
                 console.log(this.state.noteText);
             }
 
-            async postNote(ev){
+            async POSTNote(ev){
                 ev.preventDefault();
-                //const newNote = await axios.post(`https://acme-users-api-rev.herokuapp.com/api/users/${this.state.user.id}/notes`, {archived: false, text: `test note text`});
                 const newNote = await axios.post(`https://acme-users-api-rev.herokuapp.com/api/users/${this.state.user.id}/notes`, {archived: false, text: `${this.state.noteText}`});
-                console.log(newNote);
+                //TODO: if newNote returns valid, show a success message
+                //ev.target.value = '';
             }
         }
 
-        ReactDOM.render(<APP />, root);
+        ReactDOM.render(<App />, root);
     </script>
 </html>
