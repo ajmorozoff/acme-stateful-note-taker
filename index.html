@@ -1,28 +1,18 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <script
-      src="https://unpkg.com/react@16/umd/react.development.js"
-      crossorigin
-    ></script>
-    <script
-      src="https://unpkg.com/react-dom@16/umd/react-dom.development.js"
-      crossorigin
-    ></script>
-    <script
-      src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/6.26.0/babel.js"
-      crossorigin
-    ></script>
-    <script
-      src="https://cdnjs.cloudflare.com/ajax/libs/react-router-dom/5.1.2/react-router-dom.js"
-      crossorigin=""
-    ></script>
-    <script src='https://cdnjs.cloudflare.com/ajax/libs/axios/0.19.0/axios.js'></script>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <script src="https://unpkg.com/react@16/umd/react.development.js" crossorigin></script>
+        <script src="https://unpkg.com/react-dom@16/umd/react-dom.development.js"crossorigin></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/6.26.0/babel.js" crossorigin></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/react-router-dom/5.1.2/react-router-dom.js"></script>
+        <script src='https://cdnjs.cloudflare.com/ajax/libs/axios/0.19.0/axios.js'></script>
+        <link rel="stylesheet" type="text/css" href="styles.css">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     </head>
     <body>
         <div id='root'> </div>
     </body>
+
     <script type='text/babel'>
         const root = document.getElementById('root');
         const API = 'https://acme-users-api-rev.herokuapp.com/api';
@@ -67,14 +57,19 @@
                 if(this.state.user){
                     return (
                         <div>
-                            <h1>Acme Note-taker for {this.state.user.fullName}</h1>
+                            <h1>Note-taker for {this.state.user.fullName}</h1>
                                 <BrowserRouter>
-                                    <Link to="/notes">All Notes</Link>
-                                    <Link to="/create">Create Notes</Link>
-                                    <Switch>
-                                        <Route path="/notes" render={() => <NotesDisplay user={this.state.user} />} />
-                                        <Route path="/create" render={() => <NoteCreate user={this.state.user} />} />
-                                    </Switch>
+                                    <div id="nav-bar" className="nav-bar">
+                                        <Link to="/notes">All Notes</Link>
+                                        <Link to="/archived">Archived Notes</Link>
+                                        <Link to="/create">Create Notes</Link>
+                                    </div>
+                                        <Switch>
+                                            <Redirect from="/" exact to="/notes"/>
+                                            <Route path="/notes" render={() => <NotesDisplay user={this.state.user} />} />
+                                            <Route path="/archived" render={() => <ArchivedNotes user={this.state.user} />} />
+                                            <Route path="/create" render={() => <NoteCreate user={this.state.user} />} />
+                                        </Switch>
                                 </BrowserRouter>
                         </div>
                     )
@@ -94,11 +89,18 @@
             }
 
             async fetchNotes() {
-                const response = await axios.get(`https://acme-users-api-rev.herokuapp.com/api/users/${this.state.user.id}/notes`);
-                this.setState({ notes: response.data });
+                const response = (await axios.get(`https://acme-users-api-rev.herokuapp.com/api/users/${this.state.user.id}/notes`)).data;
+                const activeNotes = response.filter(note => note.archived === false);
+                this.setState({ notes: activeNotes });
             }
 
             async componentDidMount(){
+                await this.fetchNotes();
+            }
+
+            async archiveNote(noteID, text) {
+                const updatedNote = await axios.put(`https://acme-users-api-rev.herokuapp.com/api/users/${this.state.user.id}/notes/${noteID}`, {archived: true, text: `${text}`});
+                console.log(updatedNote);
                 await this.fetchNotes();
             }
 
@@ -108,14 +110,17 @@
             }
 
             render(){
-                if(this.state.notes){
+                if (this.state.notes === null) {
+                    return <div>Loading...</div>
+                }
+                if(this.state.notes.length){
                     return (
                         <ul>
                             {
                                 this.state.notes.map(note => 
                                 <li key={note.id}>
                                     {note.text}
-                                    <button>Archive</button>
+                                    <button onClick={() => {this.archiveNote(note.id, note.text)}}>Archive</button>
                                     <button onClick={() => {this.DELETENote(note.id)}}>Destroy</button>
                                 </li>)
                             }
@@ -147,7 +152,6 @@
 
             logText(ev){
                 this.setState({[ev.target.name]: ev.target.value});
-                console.log(this.state.noteText);
             }
 
             async POSTNote(ev){
@@ -156,6 +160,58 @@
                 //TODO: if newNote returns valid, show a success message
                 //ev.target.value = '';
             }
+        }
+
+        class ArchivedNotes extends Component {
+            constructor(props) {
+                super();
+                this.state ={
+                    user: props.user,
+                    archived: null,
+                }
+            }
+
+            async fetchArchived() {
+                const response = (await axios.get(`https://acme-users-api-rev.herokuapp.com/api/users/${this.state.user.id}/notes`)).data;
+                const archived = response.filter(note => note.archived === true);
+                this.setState({ archived });
+            }
+
+            async componentDidMount(){
+                await this.fetchArchived();
+            }
+
+            async unArchiveNote(noteID, text) {
+                const updatedNote = await axios.put(`https://acme-users-api-rev.herokuapp.com/api/users/${this.state.user.id}/notes/${noteID}`, {archived: false, text: `${text}`});
+                await this.fetchArchived();
+            }
+
+            async DELETENote(noteID) {
+                await axios.delete(`https://acme-users-api-rev.herokuapp.com/api/users/${this.state.user.id}/notes/${noteID}`);
+                await this.fetchArchived();
+            }
+
+            render(){
+                if (this.state.archived === null) {
+                    return <div>Loading...</div>
+                }
+                if(this.state.archived.length){
+                    return (
+                        <ul>
+                            {
+                                this.state.archived.map(note => 
+                                <li key={note.id}>
+                                    {note.text}
+                                    <button onClick={() => {this.unArchiveNote(note.id, note.text)}}>Unarchive</button>
+                                    <button onClick={() => {this.DELETENote(note.id)}}>Destroy</button>
+                                </li>)
+                            }
+                        </ul>
+                    );
+                }
+                return <div>No archived notes</div>
+            }
+
         }
 
         ReactDOM.render(<App />, root);
